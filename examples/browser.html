@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>nanobot-js 🐈</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+      background: #0a0a0a; color: #e0e0e0;
+      max-width: 780px; margin: 0 auto; padding: 24px;
+    }
+    h1 { font-size: 1.4rem; margin-bottom: 4px; color: #7dd3fc; }
+    .subtitle { color: #666; font-size: 0.8rem; margin-bottom: 20px; }
+    .config { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+    .config input, .config select {
+      padding: 7px 10px; border: 1px solid #333; border-radius: 6px;
+      background: #1a1a1a; color: #e0e0e0; font-family: inherit; font-size: 0.82rem;
+    }
+    .config input:first-child { flex: 1; min-width: 200px; }
+    .config select { max-width: 180px; }
+    .tabs { display: flex; gap: 2px; margin-bottom: 0; }
+    .tab { padding: 6px 14px; background: #1a1a1a; color: #666; border-radius: 6px 6px 0 0;
+      cursor: pointer; font-size: 0.78rem; border: 1px solid #222; border-bottom: none; }
+    .tab.active { background: #111; color: #e0e0e0; }
+    .panel { display: none; border: 1px solid #222; border-radius: 0 8px 8px 8px; background: #111; }
+    .panel.active { display: block; }
+    .chat { min-height: 320px; max-height: 480px; overflow-y: auto; padding: 12px; }
+    .bootstrap-view { max-height: 400px; overflow-y: auto; padding: 12px; }
+    .bootstrap-view pre { font-size: 0.75rem; color: #888; line-height: 1.4; white-space: pre-wrap; word-break: break-word; }
+    .bootstrap-view .section { margin-bottom: 12px; }
+    .bootstrap-view .section-title { color: #7dd3fc; font-weight: 600; font-size: 0.8rem; margin-bottom: 4px; cursor: pointer; }
+    .bootstrap-view .section-body { display: none; }
+    .bootstrap-view .section-body.open { display: block; }
+    .browse-panel { padding: 0; position: relative; }
+    .browse-bar { display: flex; align-items: center; gap: 6px; padding: 8px 10px; background: #0e0e0e; border-bottom: 1px solid #222; }
+    .browse-bar .url-display {
+      flex: 1; padding: 5px 10px; border: 1px solid #333; border-radius: 4px;
+      background: #1a1a1a; color: #888; font-family: monospace; font-size: 0.75rem;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .browse-bar button { padding: 5px 12px; font-size: 0.75rem; }
+    .browse-frame { width: 100%; height: 420px; border: none; background: #fff; border-radius: 0 0 8px 8px; }
+    .browse-empty { display: flex; align-items: center; justify-content: center; height: 420px; color: #444; font-size: 0.85rem; }
+    .msg { margin-bottom: 10px; padding: 8px 12px; border-radius: 6px; font-size: 0.88rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+    .msg.user { background: #1e3a5f; color: #bde; }
+    .msg.assistant { background: #1a2e1a; color: #beb; }
+    .msg.tool { background: #2a2a1a; color: #eeb; font-size: 0.78rem; }
+    .msg.status { background: transparent; color: #555; font-size: 0.78rem; font-style: italic; }
+    .input-row { display: flex; gap: 8px; margin-top: 12px; }
+    .input-row input {
+      flex: 1; padding: 10px 14px; border: 1px solid #333; border-radius: 8px;
+      background: #1a1a1a; color: #e0e0e0; font-family: inherit; font-size: 0.88rem;
+    }
+    .input-row input:focus { outline: none; border-color: #7dd3fc; }
+    button {
+      padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer;
+      background: #2563eb; color: white; font-family: inherit; font-weight: 600; font-size: 0.85rem;
+    }
+    button:hover { background: #1d4ed8; }
+    button:disabled { background: #333; cursor: not-allowed; }
+    .meta { margin-top: 10px; color: #444; font-size: 0.72rem; }
+  </style>
+</head>
+<body>
+  <h1>nanobot-js 🐈</h1>
+  <p class="subtitle">Full Python bootstrap prompt • Unix-style pipeline • Running in your browser</p>
+
+  <div class="config">
+    <input id="apiKey" type="password" placeholder="API Key" />
+    <input id="baseURL" type="text" placeholder="Base URL (default: OpenAI)" style="flex:0.6;min-width:160px;" />
+    <input id="model" type="text" value="gpt-4o-mini" style="max-width:150px;" />
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('chat')">Chat</div>
+    <div class="tab" onclick="switchTab('browse')">Browse</div>
+    <div class="tab" onclick="switchTab('bootstrap')">System Prompt</div>
+  </div>
+
+  <div class="panel active" id="panel-chat">
+    <div class="chat" id="chat"></div>
+  </div>
+  <div class="panel" id="panel-browse">
+    <div class="browse-panel">
+      <div class="browse-bar">
+        <span class="url-display" id="browseUrl">No page loaded</span>
+        <button onclick="openBrowseExternal()">↗ Open</button>
+      </div>
+      <div id="browseContent">
+        <div class="browse-empty">Ask nanobot to browse a URL, or use the <code>browse</code> tool</div>
+      </div>
+    </div>
+  </div>
+  <div class="panel" id="panel-bootstrap">
+    <div class="bootstrap-view" id="bootstrapView"></div>
+  </div>
+
+  <div class="input-row">
+    <input id="userInput" type="text" placeholder="Ask nanobot something..." />
+    <button id="sendBtn" onclick="handleSend()">Send</button>
+  </div>
+  <div class="meta" id="meta"></div>
+
+<script type="module">
+
+// ╔════════════════════════════════════════════════════════════════════════════╗
+// ║  BOOTSTRAP: The full Python workspace, inline as plain strings           ║
+// ╚════════════════════════════════════════════════════════════════════════════╝
+
+// Exactly what Python's ContextBuilder._get_identity() + _load_bootstrap_files()
+// + MemoryStore.get_memory_context() + SkillsLoader.build_skills_summary() produce.
+// In Python these come from disk. Here they're just strings. That's the point.
+
+const now = new Date().toLocaleString("en-US", { dateStyle: "full", timeStyle: "short" });
+
+const IDENTITY = `# nanobot 🐈
+
+You are nanobot, a lightweight AI assistant following Unix philosophy: do one thing well.
+
+## Execution Philosophy
+
+**Simple questions**: Answer directly without using tools (math, common knowledge).
+
+**Factual questions about people/events/things**: Use tools to find current information, don't guess.
+
+**Tasks requiring information**: Use tools to gather data, then answer.
+
+**Complex tasks**:
+1. Break down into steps
+2. Execute each step with appropriate tools
+3. Verify results before proceeding
+4. Synthesize findings into a coherent answer
+
+**On errors**: Be proactive, not passive.
+- Analyze the error, infer user intent, try alternatives
+- Use available tools to investigate and recover
+- Only report failure after genuinely attempting to help
+
+**Self-termination**: When you have enough information to answer completely, stop calling tools and respond. Don't over-research simple questions.
+
+## Environment
+- Time: ${now}
+- Runtime: Browser (nanobot-js)
+- Storage: In-memory (sessionStorage)`;
+
+const AGENTS_MD = `## AGENTS.md
+
+# Agent Instructions
+
+You are a helpful AI assistant. Be concise, accurate, and friendly.
+
+## Guidelines
+
+- Explain what you're doing before taking actions
+- Ask for clarification when the request is ambiguous
+- Use tools to help accomplish tasks
+
+## Tools Available
+
+- web_search: Search the web (DuckDuckGo, no API key needed)
+- web_fetch: Fetch and extract text content from a URL
+- browse: Open a URL in the Browse tab so the user can SEE the page visually
+- get_time: Get current time in any timezone
+- calculate: Evaluate math expressions
+- read_note / write_note: Read/write persistent notes (sessionStorage)
+- list_notes: List all saved notes
+
+## When to use browse vs web_fetch
+
+- **browse**: When the user wants to SEE/VIEW a webpage (visual preview in iframe + text extraction)
+- **web_fetch**: When you just need the text content for analysis (no visual)
+
+## Memory
+
+Use notes to accumulate knowledge over time:
+- After a non-trivial task, save learnings with write_note
+- Check existing notes with list_notes before starting a task`;
+
+const SOUL_MD = `## SOUL.md
+
+# Soul
+
+I am nanobot 🐈, a personal AI assistant.
+
+## Personality
+
+- Helpful and friendly
+- Concise and to the point
+- Curious and eager to learn
+
+## Values
+
+- Accuracy over speed
+- User privacy and safety
+- Transparency in actions
+
+## Communication Style
+
+- Be clear and direct
+- Explain reasoning when helpful
+- Ask clarifying questions when needed`;
+
+const USER_MD = `## USER.md
+
+# User Profile
+
+- **Language**: Auto-detect (respond in user's language)
+- **Response Length**: Adaptive based on question
+- **Technical Level**: Adaptive`;
+
+const MEMORY = `## Long-term Memory
+
+(No memories yet — nanobot will learn from this session.)`;
+
+const SKILLS_SUMMARY = `## Skills
+
+Available browser tools:
+  • web_search: Search the web for information (DuckDuckGo)
+  • web_fetch: Fetch and extract text from a URL (text only)
+  • browse: Open a URL in the Browse tab for visual preview (user can see the page)
+  • get_time: Get current date/time in any timezone
+  • calculate: Evaluate math expressions safely
+  • read_note: Read a saved note from sessionStorage
+  • write_note: Save a note to sessionStorage
+  • list_notes: List all saved note keys`;
+
+const REFLECT_PROMPT = `Errors detected. Analyze what went wrong and try a different approach.
+
+Review the error messages carefully. Consider:
+1. What assumption was wrong?
+2. Is there an alternative tool or method?
+3. Did you misunderstand the task?
+
+Then retry with a corrected approach.`;
+
+// Assemble — mirrors Python's ContextBuilder.build_system_prompt()
+function buildSystemPrompt() {
+  return [IDENTITY, AGENTS_MD, SOUL_MD, USER_MD, MEMORY, SKILLS_SUMMARY].join("\n\n---\n\n");
+}
+
+
+// ╔════════════════════════════════════════════════════════════════════════════╗
+// ║  CORE: pipe / loop / gate / tools / reflect (inline, ~80 lines)          ║
+// ╚════════════════════════════════════════════════════════════════════════════╝
+
+const S = { RUNNING: "running", COMPLETED: "completed", MAX_ITER: "max_iter", ERROR: "error" };
+
+const createState = (init) => Object.freeze({ content: "", errors: [], tokens: 0, status: S.RUNNING, meta: {}, ...init });
+const done = (s, c) => createState({ messages: s.messages, content: c ?? s.content, errors: [...s.errors], tokens: s.tokens, status: S.COMPLETED, meta: { ...s.meta } });
+
+function pipe(...steps) {
+  return async (s, ctx) => { for (const fn of steps) { s = await fn(s, ctx); if (s.status !== S.RUNNING) break; } return s; };
+}
+function loop(body, { until = s => s.status !== S.RUNNING, maxIter = 10 } = {}) {
+  return async (s, ctx) => {
+    for (let i = 0; i < maxIter; i++) { s = await body(s, ctx); if (until(s) || s.status !== S.RUNNING) return s; }
+    return createState({ ...s, status: S.MAX_ITER });
+  };
+}
+function gate(cond, { then: t, otherwise: o } = {}) {
+  return async (s, ctx) => cond(s) ? t(s, ctx) : o ? o(s, ctx) : s;
+}
+
+const MUTATING = new Set(["write_note"]);
+
+function tools({ maxRounds = 10 } = {}) {
+  return async (s, ctx) => {
+    let msgs = [...s.messages], errors = [...s.errors], tokens = s.tokens, cost = s.meta.cost ?? 0;
+    const used = [], defs = ctx.tools.getDefinitions();
+    for (let r = 0; r < maxRounds; r++) {
+      const resp = await ctx.provider.chat(msgs, defs, ctx.model);
+      tokens += resp.usage.total_tokens ?? 0; cost += resp.usage.cost ?? 0;
+      if (!resp.has_tool_calls) return createState({ messages: msgs, content: resp.content ?? "", errors, tokens, status: S.COMPLETED, meta: { ...s.meta, tools_used: used, cost } });
+      used.push(...resp.tool_calls.map(tc => tc.name));
+      addMsg("status", `  ⚙ round ${r+1}: ${resp.tool_calls.map(tc => tc.name).join(", ")}`);
+      const fmt = resp.tool_calls.map(tc => ctx.provider.formatToolCall(tc));
+      msgs = ctx.context.addAssistantMessage(msgs, resp.content, fmt);
+      const calls = resp.tool_calls;
+      const hasMut = calls.some(tc => MUTATING.has(tc.name));
+      if (calls.length === 1 || hasMut) {
+        for (const tc of calls) { const re = await ctx.tools.execute(tc.name, tc.arguments); msgs = ctx.context.addToolResult(msgs, tc.id, tc.name, re.content); if (re.is_error) errors.push(re.content); addMsg("tool", `🔧 ${tc.name} → ${re.content.slice(0, 300)}`); }
+      } else {
+        const results = await Promise.all(calls.map(async tc => ({ tc, result: await ctx.tools.execute(tc.name, tc.arguments) })));
+        for (const { tc, result } of results) { msgs = ctx.context.addToolResult(msgs, tc.id, tc.name, result.content); if (result.is_error) errors.push(result.content); addMsg("tool", `🔧 ${tc.name} → ${result.content.slice(0, 300)}`); }
+      }
+    }
+    return createState({ messages: msgs, content: "", errors, tokens, status: S.MAX_ITER, meta: { ...s.meta, tools_used: used, cost } });
+  };
+}
+
+function reflect({ maxRetries = 3 } = {}) {
+  return async (s, ctx) => {
+    const retries = s.meta.retries ?? 0;
+    if (s.errors.length > 0 && retries < maxRetries) {
+      const msgs = ctx.context.addUserMessage(s.messages, ctx.context.getReflectPrompt());
+      return createState({ messages: msgs, content: s.content, errors: [], tokens: s.tokens, status: S.RUNNING, meta: { ...s.meta, retries: retries + 1 } });
+    }
+    return done(s);
+  };
+}
+
+// Default pipeline — identical to Python
+const defaultPipeline = pipe(
+  tools({ maxRounds: 10 }),
+  gate(s => s.errors.length > 0, {
+    then: loop(pipe(reflect(), tools({ maxRounds: 3 })), { until: s => s.errors.length === 0 || s.status !== S.RUNNING, maxIter: 3 })
+  })
+);
+
+
+// ╔════════════════════════════════════════════════════════════════════════════╗
+// ║  MessageOps + Provider                                                   ║
+// ╚════════════════════════════════════════════════════════════════════════════╝
+
+function createMessageOps() {
+  return {
+    addUserMessage: (msgs, content) => [...msgs, { role: "user", content }],
+    addAssistantMessage: (msgs, content, tc) => { const m = { role: "assistant", content: content ?? "" }; if (tc?.length) m.tool_calls = tc; return [...msgs, m]; },
+    addToolResult: (msgs, id, name, result) => [...msgs, { role: "tool", tool_call_id: id, name, content: result }],
+    injectSystemPrompt: (msgs, add) => msgs.map(m => m.role === "system" ? { ...m, content: (m.content ?? "") + add } : m),
+    getReflectPrompt: () => REFLECT_PROMPT,
+  };
+}
+
+function createProvider(opts) {
+  const base = (opts.baseURL || "https://api.openai.com/v1").replace(/\/$/, "");
+  return {
+    async chat(messages, t, model) {
+      const body = { model: model ?? opts.defaultModel ?? "gpt-4o", messages, max_tokens: 4096, temperature: 0.7 };
+      if (t?.length) body.tools = t;
+      const res = await fetch(`${base}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${opts.apiKey}` },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`API ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      const d = await res.json(), c = d.choices?.[0];
+      const tcs = (c.message.tool_calls ?? []).map(tc => ({ id: tc.id, name: tc.function.name, arguments: JSON.parse(tc.function.arguments || "{}") }));
+      return { content: c.message.content, tool_calls: tcs, finish_reason: c.finish_reason, usage: d.usage ?? {}, has_tool_calls: tcs.length > 0 };
+    },
+    formatToolCall: tc => ({ id: tc.id, type: "function", function: { name: tc.name, arguments: JSON.stringify(tc.arguments) } }),
+    formatToolResult: (id, name, result) => ({ role: "tool", tool_call_id: id, name, content: result }),
+  };
+}
+
+
+// ╔════════════════════════════════════════════════════════════════════════════╗
+// ║  BROWSER TOOLS (replacing Python's fs/shell/web tools)                   ║
+// ╚════════════════════════════════════════════════════════════════════════════╝
+
+function createBrowserTools() {
+  const t = new Map();
+
+  const ok = (content) => ({ content, is_error: false });
+  const err = (msg) => ({ content: `Error: ${msg}`, is_error: true, error_type: "execution" });
+
+  // get_time — replaces Python's datetime in identity
+  t.set("get_time", {
+    name: "get_time",
+    description: "Get current date and time. Optionally specify an IANA timezone (e.g. Asia/Tokyo, America/New_York).",
+    parameters: { type: "object", properties: { timezone: { type: "string", description: "IANA timezone" } } },
+    async execute(args) {
+      try {
+        const tz = args.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+        return ok(new Date().toLocaleString("en-US", { timeZone: tz, dateStyle: "full", timeStyle: "long" }) + ` (${tz})`);
+      } catch (e) { return err(e.message); }
+    },
+  });
+
+  // calculate — safe math
+  t.set("calculate", {
+    name: "calculate",
+    description: "Evaluate a mathematical expression and return the result. Supports +, -, *, /, **, %, Math.*, etc.",
+    parameters: { type: "object", properties: { expression: { type: "string", description: "Math expression" } }, required: ["expression"] },
+    async execute(args) {
+      try { return ok(String(new Function(`"use strict"; return (${args.expression})`)())); }
+      catch (e) { return err(e.message); }
+    },
+  });
+
+  // ── CORS proxy helper (tries multiple proxies) ──
+  const PROXIES = [
+    (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+    (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    (u) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+  ];
+  async function corsFetch(url) {
+    // Try direct first
+    try { const r = await fetch(url); if (r.ok) return r; } catch {}
+    // Then proxies
+    for (const proxy of PROXIES) {
+      try { const r = await fetch(proxy(url)); if (r.ok) return r; } catch {}
+    }
+    return null;
+  }
+
+  // web_search — search the web via DuckDuckGo (no API key needed)
+  t.set("web_search", {
+    name: "web_search",
+    description: "Search the web for information. Returns titles, URLs, and snippets from search results. Use this FIRST for any factual question about people, events, or things.",
+    parameters: { type: "object", properties: { query: { type: "string", description: "Search query" }, count: { type: "number", description: "Number of results (default 5)" } }, required: ["query"] },
+    async execute(args) {
+      const query = args.query;
+      const count = args.count ?? 5;
+
+      // Strategy 1: DuckDuckGo Instant Answer API (CORS-friendly, but limited)
+      try {
+        const res = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1`);
+        if (res.ok) {
+          const d = await res.json();
+          const parts = [];
+          if (d.AbstractText) parts.push(`Summary: ${d.AbstractText}\nSource: ${d.AbstractURL}`);
+          if (d.RelatedTopics) {
+            for (const topic of d.RelatedTopics.slice(0, count)) {
+              if (topic.Text) parts.push(`• ${topic.Text}\n  ${topic.FirstURL || ""}`);
+              // Subtopics
+              if (topic.Topics) for (const sub of topic.Topics.slice(0, 2)) {
+                if (sub.Text) parts.push(`• ${sub.Text}\n  ${sub.FirstURL || ""}`);
+              }
+            }
+          }
+          if (parts.length > 0) return ok(parts.join("\n\n"));
+        }
+      } catch {}
+
+      // Strategy 2: DuckDuckGo HTML via CORS proxy
+      try {
+        const res = await corsFetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`);
+        if (res) {
+          const html = await res.text();
+          const results = [];
+          // Try primary pattern
+          const regex = /<a rel="nofollow" class="result__a" href="([^"]*)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
+          let m;
+          while ((m = regex.exec(html)) && results.length < count) {
+            const href = m[1].replace(/\/\/duckduckgo\.com\/l\/\?uddg=/, "").split("&")[0];
+            const title = m[2].replace(/<[^>]+>/g, "").trim();
+            const snippet = m[3].replace(/<[^>]+>/g, "").trim();
+            if (title) results.push({ title, url: decodeURIComponent(href), snippet });
+          }
+          // Fallback: extract any links with result class
+          if (results.length === 0) {
+            const linkRegex = /<a[^>]+class="result__a"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g;
+            while ((m = linkRegex.exec(html)) && results.length < count) {
+              const href = m[1].replace(/\/\/duckduckgo\.com\/l\/\?uddg=/, "").split("&")[0];
+              const title = m[2].replace(/<[^>]+>/g, "").trim();
+              if (title) results.push({ title, url: decodeURIComponent(href), snippet: "" });
+            }
+          }
+          if (results.length > 0) return ok(results.map((r, i) => `${i+1}. ${r.title}\n   ${r.url}\n   ${r.snippet}`).join("\n\n"));
+        }
+      } catch {}
+
+      // Strategy 3: DuckDuckGo Lite (simplest HTML, most likely to parse)
+      try {
+        const res = await corsFetch(`https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(query)}`);
+        if (res) {
+          const html = await res.text();
+          const results = [];
+          // Lite version uses simple table rows with links
+          const linkRegex = /<a[^>]+href="(https?:\/\/[^"]+)"[^>]*class="result-link"[^>]*>([\s\S]*?)<\/a>/g;
+          let m;
+          while ((m = linkRegex.exec(html)) && results.length < count) {
+            const title = m[2].replace(/<[^>]+>/g, "").trim();
+            if (title) results.push({ title, url: m[1], snippet: "" });
+          }
+          // Even simpler: just grab any external links from table rows
+          if (results.length === 0) {
+            const simpleRegex = /<a[^>]+href="(https?:\/\/(?!duckduckgo)[^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
+            const seen = new Set();
+            while ((m = simpleRegex.exec(html)) && results.length < count) {
+              const url = m[1], title = m[2].replace(/<[^>]+>/g, "").trim();
+              if (title && title.length > 5 && !seen.has(url)) { seen.add(url); results.push({ title, url, snippet: "" }); }
+            }
+          }
+          if (results.length > 0) return ok(results.map((r, i) => `${i+1}. ${r.title}\n   ${r.url}\n   ${r.snippet}`).join("\n\n"));
+        }
+      } catch {}
+
+      return err(`All search strategies failed for: ${query}. Try web_fetch with a specific URL instead.`);
+    },
+  });
+
+  // web_fetch — fetch URL content, with CORS proxy fallback
+  t.set("web_fetch", {
+    name: "web_fetch",
+    description: "Fetch and extract text content from a URL. Works with most websites.",
+    parameters: { type: "object", properties: { url: { type: "string", description: "URL to fetch" } }, required: ["url"] },
+    async execute(args) {
+      const res = await corsFetch(args.url);
+      if (!res) return err(`Could not fetch ${args.url}`);
+      let text = await res.text();
+      text = text.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<[^>]+>/g, " ").replace(/\s{2,}/g, " ").trim();
+      return ok(text.slice(0, 8000) + (text.length > 8000 ? "\n...(truncated)" : ""));
+    },
+  });
+
+  // read_note — read from sessionStorage (replaces read_file)
+  t.set("read_note", {
+    name: "read_note",
+    description: "Read a saved note by key from browser storage. Use list_notes to see available keys.",
+    parameters: { type: "object", properties: { key: { type: "string", description: "Note key" } }, required: ["key"] },
+    async execute(args) {
+      const val = sessionStorage.getItem("nanobot:" + args.key);
+      return val !== null ? ok(val) : err(`Note '${args.key}' not found`);
+    },
+  });
+
+  // write_note — write to sessionStorage (replaces write_file)
+  t.set("write_note", {
+    name: "write_note",
+    description: "Save a note to browser storage. Use this to remember things across the conversation (user preferences, task results, learnings).",
+    parameters: { type: "object", properties: { key: { type: "string", description: "Note key" }, content: { type: "string", description: "Note content" } }, required: ["key", "content"] },
+    async execute(args) {
+      sessionStorage.setItem("nanobot:" + args.key, args.content);
+      return ok(`Saved note '${args.key}' (${args.content.length} chars)`);
+    },
+  });
+
+  // browse — open URL in the Browse tab (visual preview)
+  let currentBrowseUrl = "";
+  t.set("browse", {
+    name: "browse",
+    description: "Open a URL in the Browse tab so the user can see the page visually. Also returns extracted text content for your analysis. Use this when the user wants to SEE a webpage.",
+    parameters: { type: "object", properties: { url: { type: "string", description: "URL to browse" } }, required: ["url"] },
+    async execute(args) {
+      const url = args.url;
+      currentBrowseUrl = url;
+      const urlEl = document.getElementById("browseUrl");
+      const contentEl = document.getElementById("browseContent");
+      urlEl.textContent = url;
+
+      // Fetch via CORS proxy, render in blob iframe (bypasses X-Frame-Options)
+      try {
+        const res = await corsFetch(url);
+        if (res) {
+          let html = await res.text();
+          // Inject <base> so relative URLs resolve correctly
+          const base = new URL(url);
+          const baseTag = `<base href="${base.origin}/">`;
+          if (html.includes("<head>")) html = html.replace("<head>", `<head>${baseTag}`);
+          else html = baseTag + html;
+          // Blob URL — renders full HTML without X-Frame-Options restrictions
+          const blob = new Blob([html], { type: "text/html" });
+          const blobUrl = URL.createObjectURL(blob);
+          contentEl.innerHTML = `<iframe class="browse-frame" src="${blobUrl}"></iframe>`;
+
+          // Also extract text for the agent
+          const text = html
+            .replace(/<script[\s\S]*?<\/script>/gi, "")
+            .replace(/<style[\s\S]*?<\/style>/gi, "")
+            .replace(/<[^>]+>/g, " ")
+            .replace(/\s{2,}/g, " ").trim();
+          // Switch to browse tab
+          window.switchTab?.("browse");
+          return ok(`Opened ${url} in Browse tab.\n\nExtracted text (first 4000 chars):\n${text.slice(0, 4000)}`);
+        }
+      } catch {}
+
+      // Fallback: try direct iframe (works for sites without X-Frame-Options)
+      contentEl.innerHTML = `<iframe class="browse-frame" src="${url}"></iframe>`;
+      window.switchTab?.("browse");
+      return ok(`Opened ${url} in Browse tab (direct iframe — may be blocked by some sites). Use web_fetch to read the page content.`);
+    },
+  });
+
+  // list_notes — list sessionStorage keys (replaces list_dir)
+  t.set("list_notes", {
+    name: "list_notes",
+    description: "List all saved note keys in browser storage.",
+    parameters: { type: "object", properties: {} },
+    async execute() {
+      const keys = [];
+      for (let i = 0; i < sessionStorage.length; i++) {
+        const k = sessionStorage.key(i);
+        if (k?.startsWith("nanobot:")) keys.push(k.slice(8));
+      }
+      return ok(keys.length > 0 ? keys.join("\n") : "(no notes saved yet)");
+    },
+  });
+
+  return {
+    getDefinitions: () => Array.from(t.values()).map(tool => ({ type: "function", function: { name: tool.name, description: tool.description, parameters: tool.parameters } })),
+    execute: async (name, args) => { const tool = t.get(name); if (!tool) return err(`Tool '${name}' not found`); return tool.execute(args); },
+  };
+}
+
+
+// ╔════════════════════════════════════════════════════════════════════════════╗
+// ║  UI                                                                      ║
+// ╚════════════════════════════════════════════════════════════════════════════╝
+
+const chatEl = document.getElementById("chat");
+const metaEl = document.getElementById("meta");
+const inputEl = document.getElementById("userInput");
+const sendBtn = document.getElementById("sendBtn");
+const history = [];
+
+function addMsg(type, text) {
+  const div = document.createElement("div");
+  div.className = `msg ${type}`;
+  div.textContent = text;
+  chatEl.appendChild(div);
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+// Open current browse URL in new tab
+window.openBrowseExternal = function() {
+  const url = document.getElementById("browseUrl").textContent;
+  if (url && url !== "No page loaded") window.open(url, "_blank");
+};
+
+// Tab switching
+window.switchTab = function(name) {
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+  document.querySelector(`.tab[onclick*="${name}"]`).classList.add("active");
+  document.getElementById(`panel-${name}`).classList.add("active");
+};
+
+// Render bootstrap sections (collapsible)
+function renderBootstrap() {
+  const view = document.getElementById("bootstrapView");
+  const sections = [
+    ["Identity", IDENTITY],
+    ["AGENTS.md", AGENTS_MD],
+    ["SOUL.md", SOUL_MD],
+    ["USER.md", USER_MD],
+    ["Memory", MEMORY],
+    ["Skills", SKILLS_SUMMARY],
+    ["Reflect Prompt", REFLECT_PROMPT],
+  ];
+  view.innerHTML = sections.map(([title, content]) => `
+    <div class="section">
+      <div class="section-title" onclick="this.nextElementSibling.classList.toggle('open')">▸ ${title}</div>
+      <div class="section-body"><pre>${content.replace(/</g, '&lt;')}</pre></div>
+    </div>
+  `).join("");
+}
+renderBootstrap();
+
+// Main send handler
+window.handleSend = async function () {
+  const apiKey = document.getElementById("apiKey").value.trim();
+  const baseURL = document.getElementById("baseURL").value.trim() || undefined;
+  const model = document.getElementById("model").value.trim() || "gpt-4o-mini";
+  const text = inputEl.value.trim();
+  if (!apiKey) { alert("Enter an API key"); return; }
+  if (!text) return;
+
+  // Switch to chat tab
+  switchTab("chat");
+
+  inputEl.value = "";
+  sendBtn.disabled = true;
+  addMsg("user", text);
+  addMsg("status", "⏳ Running pipeline...");
+
+  try {
+    const provider = createProvider({ apiKey, baseURL, defaultModel: model });
+    const ctx = { provider, tools: createBrowserTools(), context: createMessageOps(), model };
+
+    history.push({ role: "user", content: text });
+
+    // Build messages — system prompt is just a string, like we said
+    const messages = [
+      { role: "system", content: buildSystemPrompt() },
+      ...history,
+    ];
+
+    const state = await defaultPipeline(createState({ messages }), ctx);
+
+    // Remove status message
+    chatEl.querySelector(".msg.status:last-of-type")?.remove();
+
+    addMsg("assistant", state.content);
+    history.push({ role: "assistant", content: state.content });
+
+    const toolsList = (state.meta.tools_used || []);
+    metaEl.textContent = `tokens: ${state.tokens} | tools: ${toolsList.join(", ") || "none"} (${toolsList.length} calls) | status: ${state.status}`;
+  } catch (e) {
+    chatEl.querySelector(".msg.status:last-of-type")?.remove();
+    addMsg("status", `❌ ${e.message}`);
+  } finally {
+    sendBtn.disabled = false;
+    inputEl.focus();
+  }
+};
+
+inputEl.addEventListener("keydown", e => { if (e.key === "Enter" && !sendBtn.disabled) handleSend(); });
+
+</script>
+</body>
+</html>

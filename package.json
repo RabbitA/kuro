@@ -1,0 +1,51 @@
+{
+  "name": "@nanobot/core",
+  "version": "0.1.0",
+  "description": "Unix-style pipeline framework for AI agents. Isomorphic — runs in Node.js and browsers.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./core": {
+      "import": "./dist/core/index.js",
+      "types": "./dist/core/index.d.ts"
+    },
+    "./providers": {
+      "import": "./dist/providers/index.js",
+      "types": "./dist/providers/index.d.ts"
+    },
+    "./tools": {
+      "import": "./dist/tools/index.js",
+      "types": "./dist/tools/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "check": "tsc --noEmit",
+    "test": "node --experimental-vm-modules node_modules/.bin/vitest run",
+    "test:watch": "node --experimental-vm-modules node_modules/.bin/vitest"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "pipeline",
+    "llm",
+    "openai",
+    "anthropic",
+    "isomorphic"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vitest": "^2.0.0"
+  }
+}

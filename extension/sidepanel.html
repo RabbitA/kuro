@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>kuro 🐈‍⬛</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+      background: #0a0a0a; color: #e0e0e0;
+      padding: 12px; height: 100vh; display: flex; flex-direction: column;
+    }
+    h1 { font-size: 1.1rem; margin-bottom: 2px; color: #7dd3fc; }
+    .subtitle { color: #666; font-size: 0.7rem; margin-bottom: 10px; }
+    .config { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+    .config input {
+      padding: 6px 8px; border: 1px solid #333; border-radius: 5px;
+      background: #1a1a1a; color: #e0e0e0; font-family: inherit; font-size: 0.78rem;
+    }
+    .config input:first-child { flex: 1; min-width: 120px; }
+    .tabs { display: flex; gap: 2px; margin-bottom: 0; }
+    .tab {
+      padding: 5px 10px; background: #1a1a1a; color: #666; border-radius: 5px 5px 0 0;
+      cursor: pointer; font-size: 0.72rem; border: 1px solid #222; border-bottom: none;
+    }
+    .tab.active { background: #111; color: #e0e0e0; }
+    .panel {
+      display: none; border: 1px solid #222; border-radius: 0 6px 6px 6px;
+      background: #111; flex: 1; min-height: 0;
+    }
+    .panel.active { display: flex; flex-direction: column; }
+    .chat { flex: 1; overflow-y: auto; padding: 10px; }
+    .settings-view { flex: 1; overflow-y: auto; padding: 10px; }
+    .settings-view .section { margin-bottom: 10px; }
+    .settings-view .section-title { color: #7dd3fc; font-weight: 600; font-size: 0.75rem; cursor: pointer; }
+    .settings-view .section-body { display: none; }
+    .settings-view .section-body.open { display: block; }
+    .settings-view pre { font-size: 0.68rem; color: #888; line-height: 1.3; white-space: pre-wrap; word-break: break-word; }
+    .msg {
+      margin-bottom: 8px; padding: 6px 10px; border-radius: 5px;
+      font-size: 0.82rem; line-height: 1.4; white-space: pre-wrap; word-break: break-word;
+    }
+    .msg.user { background: #1e3a5f; color: #bde; }
+    .msg.assistant { background: #1a2e1a; color: #beb; }
+    .msg.tool { background: #2a2a1a; color: #eeb; font-size: 0.72rem; }
+    .msg.status { background: transparent; color: #555; font-size: 0.72rem; font-style: italic; }
+    .input-row { display: flex; gap: 6px; margin-top: 8px; flex-shrink: 0; }
+    .input-row input {
+      flex: 1; padding: 8px 10px; border: 1px solid #333; border-radius: 6px;
+      background: #1a1a1a; color: #e0e0e0; font-family: inherit; font-size: 0.82rem;
+    }
+    .input-row input:focus { outline: none; border-color: #7dd3fc; }
+    button {
+      padding: 8px 14px; border: none; border-radius: 6px; cursor: pointer;
+      background: #2563eb; color: white; font-family: inherit; font-weight: 600; font-size: 0.8rem;
+    }
+    button:hover { background: #1d4ed8; }
+    button:disabled { background: #333; cursor: not-allowed; }
+    .meta { margin-top: 6px; color: #444; font-size: 0.68rem; flex-shrink: 0; }
+    .tab-info { padding: 8px 10px; background: #0e0e0e; border-bottom: 1px solid #222; font-size: 0.72rem; color: #888; }
+    .tab-info .url { color: #7dd3fc; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <h1>kuro 🐈‍⬛</h1>
+  <p class="subtitle">Browser agent • sees what's visible, clicks what's clickable</p>
+
+  <div class="config">
+    <input id="apiKey" type="password" placeholder="API Key" />
+    <input id="baseURL" type="text" placeholder="Base URL" style="flex:0.5;min-width:100px;" />
+    <input id="model" type="text" value="gpt-4o-mini" style="max-width:120px;" />
+    <input id="maxRounds" type="number" value="15" min="1" max="100" title="Max tool rounds" style="max-width:50px;text-align:center;" />
+    <input id="strongModel" type="text" placeholder="Strong model" title="Strong model for knowledge refinement (e.g. chatgpt-4o-latest)" style="max-width:140px;border-left:2px solid #7dd3fc44;" />
+  </div>
+
+  <div id="resumeBanner" style="display:none;background:#1e3a5f;padding:8px 10px;border-radius:5px;margin-bottom:6px;font-size:0.72rem;">
+    <span style="color:#7dd3fc;">Resume previous task?</span>
+    <div id="resumePreview" style="color:#999;margin:3px 0;"></div>
+    <button id="resumeBtn" style="padding:3px 10px;font-size:0.7rem;margin-right:4px;">Resume</button>
+    <button id="discardBtn" style="padding:3px 10px;font-size:0.7rem;background:#555;">Discard</button>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="chat">Chat</div>
+    <div class="tab" data-tab="settings">System</div>
+    <div class="tab" data-tab="memory">Memory</div>
+    <div class="tab" data-tab="skills">Skills</div>
+    <div class="tab" data-tab="metrics">Metrics</div>
+  </div>
+
+  <div class="panel active" id="panel-chat">
+    <div id="tabInfo" class="tab-info">Connecting to active tab...</div>
+    <div class="chat" id="chat"></div>
+  </div>
+  <div class="panel" id="panel-settings">
+    <div class="settings-view" id="settingsView"></div>
+  </div>
+  <div class="panel" id="panel-memory">
+    <div style="padding:10px;overflow-y:auto;flex:1;display:flex;flex-direction:column;">
+      <div id="memoryView" style="flex:1;font-size:0.72rem;color:#aaa;line-height:1.5;">(no site strategies yet)</div>
+      <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
+        <button id="refineKnowledge" style="padding:5px 12px;font-size:0.7rem;background:#1e3a5f;" title="Use strong model to audit, deduplicate, and refine all knowledge">🔬 Refine</button>
+        <button id="autoEvolve" style="padding:5px 12px;font-size:0.7rem;background:#1a3a1a;" title="Strong model generates tasks → kuro executes → reflect → repeat">🔄 Auto-Evolve</button>
+        <button id="stopEvolve" style="display:none;padding:5px 12px;font-size:0.7rem;background:#dc2626;">⏹ Stop Loop</button>
+        <button id="clearAllStrategies" style="padding:5px 12px;font-size:0.7rem;background:#552222;">Clear All</button>
+      </div>
+    </div>
+  </div>
+  <div class="panel" id="panel-skills">
+    <div style="padding:10px;overflow-y:auto;flex:1;display:flex;flex-direction:column;">
+      <button id="importSkill" style="padding:5px 12px;font-size:0.7rem;background:#1e3a5f;align-self:flex-start;margin-bottom:8px;">Import .md</button>
+      <div id="skillsView" style="flex:1;font-size:0.72rem;color:#aaa;line-height:1.5;">(no skills installed)</div>
+    </div>
+  </div>
+  <div class="panel" id="panel-metrics">
+    <div style="padding:10px;overflow-y:auto;flex:1;display:flex;flex-direction:column;">
+      <pre id="metricsView" style="font-size:0.72rem;color:#aaa;line-height:1.5;white-space:pre-wrap;flex:1;">(run a task to see metrics)</pre>
+      <button id="exportMetrics" style="margin-top:8px;padding:5px 12px;font-size:0.7rem;background:#333;align-self:flex-start;">Export JSON</button>
+    </div>
+  </div>
+
+  <div class="input-row">
+    <input id="userInput" type="text" placeholder="Tell kuro what to do..." />
+    <button id="sendBtn">Go</button>
+    <button id="stopBtn" style="display:none;background:#dc2626;">Stop</button>
+  </div>
+  <div class="meta" id="meta"></div>
+
+  <script src="pdf.min.js"></script>
+  <script src="sidepanel.js"></script>
+</body>
+</html>
